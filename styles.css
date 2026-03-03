@@ -5,6 +5,8 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { overflow-x: hidden; }
+
 :root {
   --bg:         #0a0a0a;
   --text:       #000000;          /* kept dark — used as bg in #whatson inline style */
@@ -138,7 +140,7 @@ header {
 
 /* Hamburger */
 .hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 6px; margin-left: auto; }
-.hamburger span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 0; transition: transform 0.28s ease, opacity 0.28s ease; }
+.hamburger span { display: block; width: 22px; height: 2px; background: var(--greenBright); border-radius: 0; transition: transform 0.28s ease, opacity 0.28s ease; }
 
 /* Hamburger animates to × when menu is open */
 .hamburger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
@@ -341,7 +343,7 @@ header {
 /* ─── SHARED SECTION ─── */
 
 section { padding: 6rem 2rem; scroll-margin-top: 80px; }
-.section-inner { max-width: 1100px; margin: 0 auto; }
+.section-inner { max-width: 1100px; margin: 0 auto; width: 100%; }
 
 .section-label {
   font-size: 0.6rem;
@@ -432,7 +434,7 @@ h2 {
 .tab-btn.active { background: var(--greenBright); color: #000; }
 .tab-hint { font-size: 0.72rem; color: rgba(255,255,255,0.3); margin-bottom: 1.75rem; }
 .pricing-panel { display: none; }
-.pricing-panel.active { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.09); border-radius: 0; overflow: hidden; }
+.pricing-panel.active { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 1px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.09); border-radius: 0; overflow: hidden; }
 .price-card { background: #111; padding: 1.75rem 1.5rem; transition: background var(--speed); }
 .price-card:hover { background: #161616; }
 .price-tier { font-size: 0.58rem; font-weight: 800; letter-spacing: 0.3em; text-transform: uppercase; color: var(--greenBright); margin-bottom: 0.4rem; }
