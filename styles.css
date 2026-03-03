@@ -138,7 +138,12 @@ header {
 
 /* Hamburger */
 .hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 6px; margin-left: auto; }
-.hamburger span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 0; transition: 0.3s; }
+.hamburger span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 0; transition: transform 0.28s ease, opacity 0.28s ease; }
+
+/* Hamburger animates to × when menu is open */
+.hamburger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger[aria-expanded="true"] span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.hamburger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
 
 /* ─── HERO ─── */
@@ -726,31 +731,47 @@ footer { background: #000; color: rgba(255,255,255,0.4); padding: 4rem 2rem; bor
 /* ─── RESPONSIVE: 860px ─── */
 
 @media (max-width: 860px) {
-  .nav-links { display: none; }
-  .hamburger { display: flex; }
-
-  .nav-links.open {
-    display: flex; flex-direction: column;
-    position: fixed; top: 0; right: 0; bottom: 0;
-    width: 80%; max-width: 320px;
+  /* ─── Mobile nav: visibility+transform (no display toggle) ───
+     This is the only reliable approach on iOS Safari / Samsung Internet.
+     visibility:hidden removes the panel from focus/tab order when closed;
+     the transition-delay keeps it visible for the full slide-out duration. */
+  .nav-links {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(82vw, 320px);
     background: #000;
     border-left: 1px solid rgba(255,255,255,0.09);
     padding: 0; gap: 0;
-    z-index: 1100; overflow-y: auto;
-    box-shadow: -4px 0 40px rgba(0,0,0,0.9);
-    transform: translateX(0);
-    transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
+    z-index: 1100;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Closed state */
+    transform: translateX(100%);
+    visibility: hidden;
+    transition:
+      transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0s linear 0.32s;
   }
-  .nav-links.sliding { transform: translateX(110%); }
-  .nav-links.open > li { border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .nav-links.open {
+    transform: translateX(0);
+    visibility: visible;
+    box-shadow: -4px 0 40px rgba(0,0,0,0.9);
+    transition:
+      transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0s linear 0s;
+  }
+  .hamburger { display: flex; }
+  .nav-links > li { border-bottom: 1px solid rgba(255,255,255,0.06); }
   .nav-links.open a { display: block; font-size: 0.82rem; font-weight: 800; padding: 1.1rem 1.75rem; color: rgba(255,255,255,0.75) !important; text-decoration: none; font-family: 'Outfit', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; }
   .nav-links.open .dropdown-menu { display: block; position: static; box-shadow: none; border: none; padding: 0; background: rgba(255,255,255,0.03); }
   .nav-links.open .dropdown-menu a { font-size: 0.72rem; font-weight: 700; padding: 0.7rem 1.75rem 0.7rem 2.5rem; color: rgba(255,255,255,0.45) !important; }
   .nav-links.open .nav-dropdown > a::after { display: none; }
   .nav-links.open .btn-green { margin: 1.25rem 1.75rem; padding: 0.9rem; background: var(--greenBright) !important; color: #000 !important; border-radius: 0; text-align: center; font-weight: 800; display: block; }
 
-  .nav-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1099; }
-  .nav-overlay.active { display: block; }
+  .nav-overlay { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1099; opacity: 0; pointer-events: none; transition: opacity 0.32s; }
+  .nav-overlay.active { opacity: 1; pointer-events: auto; }
 
   .tiles-grid { grid-template-columns: repeat(3, 1fr); }
   .tile:nth-child(4), .tile:nth-child(5) { grid-column: span 1; }
