@@ -138,8 +138,8 @@ header {
 .btn-green:hover { background: #16a34a; color: #fff; transform: translateY(-1px); }
 
 /* Hamburger */
-.hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 6px; margin-left: auto; }
-.hamburger span { display: block; width: 22px; height: 2px; background: var(--greenBright); border-radius: 0; transition: transform 0.28s ease, opacity 0.28s ease; }
+.hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 6px; margin-left: auto; color: #fff; }
+.hamburger span { display: block; width: 22px; height: 2px; background: currentColor; border-radius: 0; transition: transform 0.28s ease, opacity 0.28s ease; }
 
 /* Hamburger animates to × when menu is open */
 .hamburger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
