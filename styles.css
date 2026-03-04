@@ -650,6 +650,11 @@ footer { background: #000; color: rgba(255,255,255,0.4); padding: 4rem 2rem; bor
 .sustain-card h4 { font-family: 'Outfit', sans-serif; font-size: 0.84rem; font-weight: 800; color: #fff; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; }
 .sustain-card p { font-size: 0.78rem; color: rgba(255,255,255,0.4); line-height: 1.7; }
 .sustain-card p strong { color: rgba(255,255,255,0.65); }
+.sustain-details { width: 100%; margin-top: 2rem; }
+.sustain-details summary.sustain-summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5em; color: var(--greenBright); font-family: 'Outfit', sans-serif; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; padding: 0.6rem 0; user-select: none; }
+.sustain-details summary.sustain-summary::-webkit-details-marker { display: none; }
+.sustain-details summary.sustain-summary::before { content: '+'; font-size: 1rem; line-height: 1; }
+.sustain-details[open] summary.sustain-summary::before { content: '−'; }
 
 
 /* ─── GALLERY ─── */
