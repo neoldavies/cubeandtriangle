@@ -544,15 +544,17 @@ footer { background: #000; color: rgba(255,255,255,0.4); padding: 4rem 2rem; bor
 .footer-logo-name span { color: var(--greenBright); }
 .footer-tagline { font-size: 0.72rem; line-height: 1.75; max-width: 240px; color: rgba(255,255,255,0.3); }
 .footer-tagline a { color: var(--greenBright); }
-.footer-nav { display: flex; flex-direction: column; gap: 0.4rem; align-items: center; }
+.footer-nav { display: flex; flex-direction: row; gap: 1.75rem; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.footer-nav-group { display: flex; flex-direction: column; gap: 0.3rem; }
+.footer-nav-label { font-family: 'Outfit', sans-serif; font-size: 0.55rem; font-weight: 800; color: rgba(255,255,255,0.22); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 0.15rem; }
 .footer-nav a { font-size: 0.68rem; color: rgba(255,255,255,0.28); letter-spacing: 0.12em; text-transform: uppercase; transition: color var(--speed); font-weight: 700; }
 .footer-nav a:hover { color: #fff; }
 .footer-social { display: flex; gap: 1rem; justify-content: flex-end; align-items: flex-start; flex-wrap: wrap; }
-.footer-social a { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.28); transition: color var(--speed); }
+.footer-social a { display: inline-flex; align-items: center; gap: 0.35em; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.28); transition: color var(--speed); }
 .footer-social a:hover { color: var(--greenBright); }
-.footer-copy { grid-column: 1 / -1; text-align: center; font-size: 0.62rem; color: rgba(255,255,255,0.18); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 2rem; letter-spacing: 0.06em; text-transform: uppercase; }
-.footer-copy a { color: rgba(255,255,255,0.22); }
-.footer-copy a:hover { color: rgba(255,255,255,0.55); }
+.footer-copy { grid-column: 1 / -1; text-align: center; font-size: 0.62rem; color: rgba(255,255,255,0.32); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 2rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.footer-copy a { color: rgba(255,255,255,0.38); }
+.footer-copy a:hover { color: rgba(255,255,255,0.65); }
 
 
 /* ─── STICKY MOBILE BAR ─── */
