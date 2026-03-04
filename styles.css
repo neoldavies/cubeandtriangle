@@ -305,6 +305,7 @@ header {
 .tile-icon { width: 32px; height: 32px; margin-bottom: 0.25rem; filter: brightness(0) invert(1) opacity(0.85); }
 .tile-name { font-family: 'Outfit', sans-serif; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; }
 .tile-count { font-size: 0.65rem; color: var(--greenBright); letter-spacing: 0.1em; font-weight: 800; text-transform: uppercase; }
+.tile-rate { font-size: 0.58rem; color: rgba(255,255,255,0.6); letter-spacing: 0.08em; font-weight: 600; text-transform: uppercase; margin-top: 0.1rem; }
 .tile-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--greenBright); transform: scaleX(0); transition: transform 0.25s; transform-origin: left; }
 .tile:hover .tile-accent { transform: scaleX(1); }
 
