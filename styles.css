@@ -218,9 +218,9 @@ header {
 
 .hero-eyebrow {
   display: inline-flex; align-items: center; gap: 0.5rem;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.16);
-  color: rgba(255,255,255,0.6);
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.82);
   font-size: 0.66rem; font-weight: 800;
   letter-spacing: 0.32em;
   text-transform: uppercase;
@@ -542,19 +542,19 @@ footer { background: #000; color: rgba(255,255,255,0.4); padding: 4rem 2rem; bor
 .footer-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; gap: 2rem; align-items: start; }
 .footer-logo-name { font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 800; color: #fff; margin-bottom: 0.4rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .footer-logo-name span { color: var(--greenBright); }
-.footer-tagline { font-size: 0.72rem; line-height: 1.75; max-width: 240px; color: rgba(255,255,255,0.3); }
+.footer-tagline { font-size: 0.72rem; line-height: 1.75; max-width: 240px; color: rgba(255,255,255,0.48); }
 .footer-tagline a { color: var(--greenBright); }
 .footer-nav { display: flex; flex-direction: row; gap: 1.75rem; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
 .footer-nav-group { display: flex; flex-direction: column; gap: 0.3rem; }
-.footer-nav-label { font-family: 'Outfit', sans-serif; font-size: 0.55rem; font-weight: 800; color: rgba(255,255,255,0.22); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 0.15rem; }
-.footer-nav a { font-size: 0.68rem; color: rgba(255,255,255,0.28); letter-spacing: 0.12em; text-transform: uppercase; transition: color var(--speed); font-weight: 700; }
+.footer-nav-label { font-family: 'Outfit', sans-serif; font-size: 0.55rem; font-weight: 800; color: rgba(255,255,255,0.32); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 0.15rem; }
+.footer-nav a { font-size: 0.68rem; color: rgba(255,255,255,0.44); letter-spacing: 0.12em; text-transform: uppercase; transition: color var(--speed); font-weight: 700; }
 .footer-nav a:hover { color: #fff; }
 .footer-social { display: flex; gap: 1rem; justify-content: flex-end; align-items: flex-start; flex-wrap: wrap; }
-.footer-social a { display: inline-flex; align-items: center; gap: 0.35em; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.28); transition: color var(--speed); }
+.footer-social a { display: inline-flex; align-items: center; gap: 0.35em; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.44); transition: color var(--speed); }
 .footer-social a:hover { color: var(--greenBright); }
-.footer-copy { grid-column: 1 / -1; text-align: center; font-size: 0.62rem; color: rgba(255,255,255,0.32); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 2rem; letter-spacing: 0.06em; text-transform: uppercase; }
-.footer-copy a { color: rgba(255,255,255,0.38); }
-.footer-copy a:hover { color: rgba(255,255,255,0.65); }
+.footer-copy { grid-column: 1 / -1; text-align: center; font-size: 0.62rem; color: rgba(255,255,255,0.42); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 2rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.footer-copy a { color: rgba(255,255,255,0.52); }
+.footer-copy a:hover { color: rgba(255,255,255,0.75); }
 
 
 /* ─── STICKY MOBILE BAR ─── */
@@ -817,6 +817,7 @@ footer { background: #000; color: rgba(255,255,255,0.4); padding: 4rem 2rem; bor
   .about-stats { grid-template-columns: 1fr 1fr; }
   .footer-inner { grid-template-columns: 1fr; }
   .footer-social { justify-content: flex-start; }
+  .hero { padding-bottom: 4rem; }
   .hero-content { padding: 4rem 1rem 4.5rem; }
   .hero h1 { font-size: clamp(3rem, 14vw, 5rem); }
   .hero-content::before { display: none; }
