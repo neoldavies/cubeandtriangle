@@ -294,9 +294,9 @@ header {
 
 /* ─── GAME TILES ─── */
 
-.tiles-section { background: #000; padding: 0; border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07); }
-.tiles-grid { display: grid; grid-template-columns: repeat(5, 1fr); }
-.tile { position: relative; overflow: hidden; aspect-ratio: 3/4; cursor: pointer; text-decoration: none; display: block; }
+.tiles-section { background: #000; padding: 4px; border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07); }
+.tiles-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.tile { position: relative; overflow: hidden; aspect-ratio: 3/4; cursor: pointer; text-decoration: none; display: block; border-radius: 14px; }
 .tile:focus-visible { outline: 3px solid var(--greenBright); outline-offset: 0; }
 .tile-bg { position: absolute; inset: 0; background-size: cover; background-position: center; transition: transform 0.5s ease; filter: brightness(0.38) saturate(0.6); }
 .tile:hover .tile-bg { transform: scale(1.05); filter: brightness(0.55) saturate(0.9); }
@@ -783,7 +783,6 @@ footer { background: #000; color: rgba(255,255,255,0.4); padding: 4rem 2rem; bor
   .nav-overlay.active { opacity: 1; pointer-events: auto; }
 
   .tiles-grid { grid-template-columns: repeat(3, 1fr); }
-  .tile:nth-child(4), .tile:nth-child(5) { grid-column: span 1; }
 
   .mem-grid { grid-template-columns: 1fr; }
   .food-grid { grid-template-columns: 1fr; }
@@ -807,8 +806,9 @@ footer { background: #000; color: rgba(255,255,255,0.4); padding: 4rem 2rem; bor
 @media (max-width: 560px) {
   .header-inner { padding: 0 1rem; }
   .logo-tag { display: none; }
-  .tiles-grid { grid-template-columns: repeat(2, 1fr); }
-  .tile:nth-child(5) { grid-column: span 2; aspect-ratio: 5/2; }
+  .tiles-grid { grid-template-columns: 1fr 1fr; }
+  .tile { aspect-ratio: 1/1; }
+  .tile:nth-child(1), .tile:nth-child(4), .tile:nth-child(5) { grid-column: 1 / -1; aspect-ratio: 3/1; }
   .offers-band { grid-template-columns: 1fr; }
   section { padding: 4.5rem 1rem; }
   .sustain-grid { grid-template-columns: 1fr; }
