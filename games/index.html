@@ -201,7 +201,7 @@
       </div>
       <div class="hud-stat">
         <span class="hud-label">Time</span>
-        <span class="hud-value" id="timeEl">30</span>
+        <span class="hud-value" id="timeEl">60</span>
       </div>
     </div>
   </div>
@@ -218,7 +218,7 @@
     </div>
   </div>
 
-  <p class="hint">Drag the cue ball to aim &mdash; release to shoot</p>
+  <p class="hint">Place cue ball, then drag to aim &mdash; release to shoot</p>
 
 <script>
 'use strict';
@@ -262,9 +262,10 @@ const WT = TY + BR,  WB = TY + TH - BR;
 const FRICTION   = 0.985;
 const REBOUND    = 0.92;
 const MAX_VEL    = 18;
-const STOP_VEL   = 0.07;
-const GAME_SECS  = 30;
+const STOP_VEL   = 0.06;        // velocity threshold for "stopped"
+const GAME_SECS  = 60;          // 60 seconds of active gameplay
 const AIM_RADIUS = BR * 3.5;    // pointer must start within this of cue ball
+const TIME_BONUS = 2;           // seconds added per potted ball
 
 // Ball colours
 const COL = { red:'#e03030', yellow:'#e8c02a', black:'#1a1a1a', white:'#f5f5f0' };
@@ -279,6 +280,11 @@ let rafId     = null;
 let lastTs    = null;
 let timerAcc  = 0;
 
+// Game state
+let placingCueBall = false;     // true when placing cue ball before break
+let breakTaken     = false;     // true after first shot
+let timerActive    = false;     // true when timer should count down
+
 // Aiming
 let aiming    = false;
 let aimPt     = null;   // where the drag started
@@ -290,6 +296,11 @@ function dist(a, b) { return Math.sqrt(d2(a, b)); }
 
 function allStopped() {
   return balls.every(b => b.potted || (Math.abs(b.vx) < STOP_VEL && Math.abs(b.vy) < STOP_VEL));
+}
+
+function cueBallStopped() {
+  if (!cueBall || cueBall.potted) return true;
+  return Math.abs(cueBall.vx) < STOP_VEL && Math.abs(cueBall.vy) < STOP_VEL;
 }
 
 function scalePoint(e) {
@@ -314,22 +325,56 @@ function findFreeSpot(existing, x0, x1, y0, y1, tries) {
 function initBalls() {
   balls = [];
 
-  const mx0 = TX + BR * 2.5, mx1 = TX + TW - BR * 2.5;
-  const my0 = TY + BR * 2.5, my1 = TY + TH * 0.64;
+  // Create proper English pool rack (triangle of 13 balls)
+  // Position rack in upper portion of table
+  const rackX = TX + TW * 0.65;  // rack apex X position
+  const rackY = TY + TH * 0.28;  // rack apex Y position
+  const gap = BR * 2.02;         // tight packing
 
-  const add = (type) => {
-    const pos = findFreeSpot(balls, mx0, mx1, my0, my1);
-    if (pos) balls.push({ ...pos, vx:0, vy:0, type, potted:false });
+  // English pool rack pattern (5 rows):
+  // Row 1: 1 ball (apex)
+  // Row 2: 2 balls
+  // Row 3: 3 balls (black in center)
+  // Row 4: 4 balls
+  // Row 5: 5 balls (not needed, only 13 balls total)
+
+  const pattern = [
+    // Row 1 (apex)
+    { row: 0, col: 0, type: 'red' },
+    // Row 2
+    { row: 1, col: 0, type: 'yellow' },
+    { row: 1, col: 1, type: 'red' },
+    // Row 3 (black in center)
+    { row: 2, col: 0, type: 'yellow' },
+    { row: 2, col: 1, type: 'black' },
+    { row: 2, col: 2, type: 'red' },
+    // Row 4
+    { row: 3, col: 0, type: 'red' },
+    { row: 3, col: 1, type: 'yellow' },
+    { row: 3, col: 2, type: 'yellow' },
+    { row: 3, col: 3, type: 'red' },
+    // Row 5 (only 3 balls to reach 13 total)
+    { row: 4, col: 0, type: 'yellow' },
+    { row: 4, col: 1, type: 'red' },
+    { row: 4, col: 2, type: 'yellow' },
+  ];
+
+  for (const p of pattern) {
+    const x = rackX - p.row * gap * 0.866;  // 0.866 = cos(30°) for hex packing
+    const y = rackY + (p.col - p.row / 2) * gap;
+    balls.push({ x, y, vx: 0, vy: 0, type: p.type, potted: false });
+  }
+
+  // Cue ball — place behind baulk line (lower portion)
+  const baulkY = TY + TH * 0.73;
+  cueBall = {
+    x: CW / 2,
+    y: baulkY + (TY + TH - baulkY) * 0.5,
+    vx: 0,
+    vy: 0,
+    type: 'cue',
+    potted: false
   };
-
-  for (let i = 0; i < 6; i++) add('red');
-  for (let i = 0; i < 6; i++) add('yellow');
-  add('black');
-
-  // Cue ball — lower third
-  const cp = findFreeSpot(balls, TX + BR*2, TX+TW-BR*2, TY+TH*0.68, TY+TH-BR*2)
-           || { x: CW/2, y: TY + TH*0.82 };
-  cueBall = { ...cp, vx:0, vy:0, type:'cue', potted:false };
   balls.push(cueBall);
 }
 
@@ -391,9 +436,19 @@ function updatePhysics() {
       if (dist(b, p) < PR * 0.88) {
         b.potted = true;
         b.vx = 0; b.vy = 0;
-        if      (b.type === 'cue')   { score -= 5; setTimeout(respotCueBall, 700); }
-        else if (b.type === 'black') { score += 25; }
-        else                         { score += 10; }
+        if (b.type === 'cue') {
+          score -= 5;
+          setTimeout(respotCueBall, 700);
+        } else {
+          // Award points and time bonus
+          if (b.type === 'black') {
+            score += 25;
+          } else {
+            score += 10;
+          }
+          // Add time bonus for potted ball
+          timeLeft += TIME_BONUS;
+        }
         updateHUD();
         break;
       }
@@ -478,14 +533,16 @@ function drawBall(b) {
   // Ball body gradient
   const g = ctx.createRadialGradient(x - BR*0.3, y - BR*0.3, BR*0.05, x, y, BR);
   switch (b.type) {
-    case 'white':
-      g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c0c0b8'); break;
+    case 'cue':
+      // Bright white cue ball with strong contrast
+      g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#e8e8e8'); break;
     case 'red':
       g.addColorStop(0, '#ff5858'); g.addColorStop(1, '#7a0000'); break;
     case 'yellow':
       g.addColorStop(0, '#ffe050'); g.addColorStop(1, '#906000'); break;
     case 'black':
-      g.addColorStop(0, '#555555'); g.addColorStop(1, '#080808'); break;
+      // Clearly dark black ball
+      g.addColorStop(0, '#2a2a2a'); g.addColorStop(1, '#000000'); break;
   }
   ctx.beginPath();
   ctx.arc(x, y, BR, 0, Math.PI*2);
@@ -500,6 +557,8 @@ function drawBall(b) {
 }
 
 function drawAim() {
+  // Don't show aiming controls while placing cue ball
+  if (placingCueBall) return;
   if (!aiming || !aimPt || !curPt || !cueBall || cueBall.potted) return;
 
   const dx    = aimPt.x - curPt.x;
@@ -556,29 +615,47 @@ function loop(ts) {
   const dt = lastTs ? (ts - lastTs) : 16.67;
   lastTs = ts;
 
-  timerAcc += dt;
-  if (timerAcc >= 1000) {
-    timerAcc -= 1000;
-    timeLeft = Math.max(0, timeLeft - 1);
-    updateHUD();
-    if (timeLeft === 0) { endGame(); return; }
+  updatePhysics();
+
+  // Timer logic: only count down when cue ball is stopped
+  const cueIsStopped = cueBallStopped();
+
+  // Start timer after break shot (once cue ball stops for the first time)
+  if (breakTaken && cueIsStopped && !timerActive) {
+    timerActive = true;
   }
 
-  updatePhysics();
+  // Count down only when cue ball is stopped and timer is active
+  if (timerActive && cueIsStopped) {
+    timerAcc += dt;
+    if (timerAcc >= 1000) {
+      timerAcc -= 1000;
+      timeLeft = Math.max(0, timeLeft - 1);
+      updateHUD();
+      if (timeLeft === 0) { endGame(); return; }
+    }
+  } else if (timerActive && !cueIsStopped) {
+    // Cue ball is moving, pause timer (don't accumulate time)
+    timerAcc = 0;
+  }
+
   render();
   rafId = requestAnimationFrame(loop);
 }
 
 function startGame() {
   if (rafId) cancelAnimationFrame(rafId);
-  score    = 0;
-  timeLeft = GAME_SECS;
-  timerAcc = 0;
-  lastTs   = null;
-  aiming   = false;
-  aimPt    = null;
-  curPt    = null;
-  running  = true;
+  score           = 0;
+  timeLeft        = GAME_SECS;
+  timerAcc        = 0;
+  lastTs          = null;
+  aiming          = false;
+  aimPt           = null;
+  curPt           = null;
+  running         = true;
+  placingCueBall  = true;   // Start in cue ball placement mode
+  breakTaken      = false;
+  timerActive     = false;
   initBalls();
   overlay.classList.remove('active');
   updateHUD();
@@ -596,8 +673,23 @@ function endGame() {
 // ── INPUT ────────────────────────────────────────────────────────────────────
 function onDown(e) {
   e.preventDefault();
-  if (!running || !allStopped() || !cueBall || cueBall.potted) return;
+  if (!running || !cueBall || cueBall.potted) return;
+
   const p = scalePoint(e);
+  const baulkY = TY + TH * 0.73;
+
+  // Cue ball placement mode (before break)
+  if (placingCueBall) {
+    if (dist(p, cueBall) <= AIM_RADIUS) {
+      aiming = true;
+      aimPt  = p;
+      curPt  = p;
+    }
+    return;
+  }
+
+  // Normal aiming mode (after break)
+  if (!allStopped()) return;
   if (dist(p, cueBall) <= AIM_RADIUS) {
     aiming = true;
     aimPt  = p;
@@ -609,11 +701,31 @@ function onMove(e) {
   e.preventDefault();
   if (!aiming) return;
   curPt = scalePoint(e);
+
+  // If placing cue ball, move it with the pointer (constrained to baulk area)
+  if (placingCueBall && cueBall) {
+    const baulkY = TY + TH * 0.73;
+    // Constrain to baulk area (behind baulk line)
+    cueBall.x = Math.max(WL, Math.min(WR, curPt.x));
+    cueBall.y = Math.max(baulkY, Math.min(WB, curPt.y));
+  }
 }
 
 function onUp(e) {
   e.preventDefault();
-  if (!aiming || !aimPt || !curPt || !cueBall) { aiming = false; return; }
+  if (!aiming || !cueBall) { aiming = false; return; }
+
+  // If placing cue ball, finish placement and switch to aiming mode
+  if (placingCueBall) {
+    placingCueBall = false;
+    aiming = false;
+    aimPt  = null;
+    curPt  = null;
+    return;
+  }
+
+  // Normal shot
+  if (!aimPt || !curPt) { aiming = false; return; }
 
   const dx    = aimPt.x - curPt.x;
   const dy    = aimPt.y - curPt.y;
@@ -624,6 +736,11 @@ function onUp(e) {
     const speed  = Math.min(power * 0.17, MAX_VEL);
     cueBall.vx   = Math.cos(angle) * speed;
     cueBall.vy   = Math.sin(angle) * speed;
+
+    // Mark that break has been taken
+    if (!breakTaken) {
+      breakTaken = true;
+    }
   }
 
   aiming = false;
