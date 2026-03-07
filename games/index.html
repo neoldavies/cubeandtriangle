@@ -233,30 +233,41 @@ const finalEl = document.getElementById('finalEl');
 document.getElementById('playAgainBtn').addEventListener('click', startGame);
 
 // ── LAYOUT CONSTANTS ─────────────────────────────────────────────────────────
-const CW = 800;
-const CH = 400;
+// Detect orientation and set canvas dimensions
+const isPortrait = window.innerHeight > window.innerWidth;
+const CW = isPortrait ? 400 : 800;
+const CH = isPortrait ? 800 : 400;
 
-const CU = 30;                    // cushion thickness (px)
-const TX = CU, TY = CU;           // table felt top-left
-const TW = CW - CU * 2;          // table width
-const TH = CH - CU * 2;          // table height
+// Update canvas size
+canvas.width  = CW;
+canvas.height = CH;
 
-const BR = CW * 0.031;           // ball radius  (~25 px)
-const PR = BR * 1.8;             // pocket radius (~45 px)
+const CU = CW * 0.0375;          // cushion thickness (3.75% of width)
+const TX = CU, TY = CU;          // table felt top-left
+const TW = CW - CU * 2;          // table width (short side)
+const TH = CH - CU * 2;          // table height (long side)
 
-// Pocket positions — 4 corners + 2 centre (long-rail midpoints, top & bottom)
+// Ball sizes - proper English pool proportions
+const OBR = TW * 0.0278;         // object ball radius (2.78% of table width)
+const CBR = TW * 0.0260;         // cue ball radius (2.60% of table width - slightly smaller)
+const PR = OBR * 1.8;            // pocket radius
+
+// Pocket positions — 4 corners + 2 centre (long-rail midpoints)
 const POCKETS = [
   { x: TX,            y: TY            },  // top-left
   { x: TX + TW / 2,  y: TY            },  // top-centre
   { x: TX + TW,      y: TY            },  // top-right
-  { x: TX,            y: TY + TH       },  // bottom-left
-  { x: TX + TW / 2,  y: TY + TH       },  // bottom-centre
-  { x: TX + TW,      y: TY + TH       },  // bottom-right
+  { x: TX,            y: TY + TH       },  // bottom-left (baulk end)
+  { x: TX + TW / 2,  y: TY + TH       },  // bottom-centre (baulk end)
+  { x: TX + TW,      y: TY + TH       },  // bottom-right (baulk end)
 ];
 
-// Physics walls (ball centre bounds, inset by ball radius)
-const WL = TX + BR,  WR = TX + TW - BR;
-const WT = TY + BR,  WB = TY + TH - BR;
+// Physics walls (use object ball radius as max for bounds)
+const WL = TX + OBR,  WR = TX + TW - OBR;
+const WT = TY + OBR,  WB = TY + TH - OBR;
+
+// Break line (1/5 of table length from baulk cushion at bottom)
+const BREAK_LINE_Y = TY + TH - (TH * 0.2);
 
 // ── PHYSICS TUNING ───────────────────────────────────────────────────────────
 const FRICTION   = 0.985;
@@ -264,7 +275,6 @@ const REBOUND    = 0.92;
 const MAX_VEL    = 18;
 const STOP_VEL   = 0.06;        // velocity threshold for "stopped"
 const GAME_SECS  = 60;          // 60 seconds of active gameplay
-const AIM_RADIUS = BR * 3.5;    // pointer must start within this of cue ball
 const TIME_BONUS = 2;           // seconds added per potted ball
 
 // Ball colours
@@ -317,7 +327,8 @@ function findFreeSpot(existing, x0, x1, y0, y1, tries) {
   for (let i = 0; i < tries; i++) {
     const x = x0 + Math.random() * (x1 - x0);
     const y = y0 + Math.random() * (y1 - y0);
-    if (existing.every(b => dist({x,y}, b) > BR * 2.5)) return { x, y };
+    // Check distance from all existing balls (use max ball radius for safety)
+    if (existing.every(b => dist({x,y}, b) > (b.radius || OBR) + CBR + OBR * 0.5)) return { x, y };
   }
   return null;
 }
@@ -325,18 +336,18 @@ function findFreeSpot(existing, x0, x1, y0, y1, tries) {
 function initBalls() {
   balls = [];
 
-  // Create proper English pool rack (triangle of 13 balls)
-  // Position rack in upper portion of table
-  const rackX = TX + TW * 0.65;  // rack apex X position
-  const rackY = TY + TH * 0.28;  // rack apex Y position
-  const gap = BR * 2.02;         // tight packing
+  // Create proper English pool rack (15 balls: 7 red, 7 yellow, 1 black)
+  // Position rack in upper portion of table (away from baulk)
+  const rackCenterX = TX + TW / 2;           // centered horizontally
+  const rackApexY = TY + TH * 0.25;          // 25% from top (75% from baulk)
+  const gap = OBR * 2.001;                   // tight packing (balls touching)
 
-  // English pool rack pattern (5 rows):
-  // Row 1: 1 ball (apex)
+  // English pool rack pattern (5 rows forming triangle):
+  // Row 1: 1 ball (apex - faces breaking player)
   // Row 2: 2 balls
   // Row 3: 3 balls (black in center)
   // Row 4: 4 balls
-  // Row 5: 5 balls (not needed, only 13 balls total)
+  // Row 5: 5 balls (base)
 
   const pattern = [
     // Row 1 (apex)
@@ -345,35 +356,38 @@ function initBalls() {
     { row: 1, col: 0, type: 'yellow' },
     { row: 1, col: 1, type: 'red' },
     // Row 3 (black in center)
-    { row: 2, col: 0, type: 'yellow' },
+    { row: 2, col: 0, type: 'red' },
     { row: 2, col: 1, type: 'black' },
-    { row: 2, col: 2, type: 'red' },
+    { row: 2, col: 2, type: 'yellow' },
     // Row 4
-    { row: 3, col: 0, type: 'red' },
-    { row: 3, col: 1, type: 'yellow' },
+    { row: 3, col: 0, type: 'yellow' },
+    { row: 3, col: 1, type: 'red' },
     { row: 3, col: 2, type: 'yellow' },
     { row: 3, col: 3, type: 'red' },
-    // Row 5 (only 3 balls to reach 13 total)
-    { row: 4, col: 0, type: 'yellow' },
-    { row: 4, col: 1, type: 'red' },
+    // Row 5 (base)
+    { row: 4, col: 0, type: 'red' },
+    { row: 4, col: 1, type: 'yellow' },
     { row: 4, col: 2, type: 'yellow' },
+    { row: 4, col: 3, type: 'red' },
+    { row: 4, col: 4, type: 'yellow' },
   ];
 
   for (const p of pattern) {
-    const x = rackX - p.row * gap * 0.866;  // 0.866 = cos(30°) for hex packing
-    const y = rackY + (p.col - p.row / 2) * gap;
-    balls.push({ x, y, vx: 0, vy: 0, type: p.type, potted: false });
+    // Triangle points toward baulk (away from apex)
+    const x = rackCenterX + (p.col - p.row / 2) * gap;
+    const y = rackApexY + p.row * gap * 0.866;  // 0.866 = sin(60°) for triangle rows
+    balls.push({ x, y, vx: 0, vy: 0, type: p.type, potted: false, radius: OBR });
   }
 
-  // Cue ball — place behind baulk line (lower portion)
-  const baulkY = TY + TH * 0.73;
+  // Cue ball — place behind break line in baulk area
   cueBall = {
-    x: CW / 2,
-    y: baulkY + (TY + TH - baulkY) * 0.5,
+    x: TX + TW / 2,
+    y: BREAK_LINE_Y + CBR * 2,  // behind break line
     vx: 0,
     vy: 0,
     type: 'cue',
-    potted: false
+    potted: false,
+    radius: CBR
   };
   balls.push(cueBall);
 }
@@ -381,8 +395,9 @@ function initBalls() {
 function respotCueBall() {
   if (!running) return;
   const others = balls.filter(b => !b.potted && b !== cueBall);
-  const pos = findFreeSpot(others, TX+BR*2, TX+TW-BR*2, TY+TH*0.68, TY+TH-BR*2)
-            || { x: CW/2, y: TY+TH*0.82 };
+  // Respot behind break line in baulk area
+  const pos = findFreeSpot(others, TX + CBR * 2, TX + TW - CBR * 2, BREAK_LINE_Y, TY + TH - CBR * 2)
+            || { x: TX + TW / 2, y: BREAK_LINE_Y + CBR * 2 };
   cueBall.x = pos.x; cueBall.y = pos.y;
   cueBall.vx = 0;    cueBall.vy = 0;
   cueBall.potted = false;
@@ -400,23 +415,31 @@ function updatePhysics() {
     if (Math.abs(b.vy) < STOP_VEL) b.vy = 0;
   }
 
-  // Cushion bounce
+  // Cushion bounce (account for each ball's radius)
   for (const b of active) {
-    if (b.x < WL)  { b.x = WL;  b.vx =  Math.abs(b.vx) * REBOUND; }
-    if (b.x > WR)  { b.x = WR;  b.vx = -Math.abs(b.vx) * REBOUND; }
-    if (b.y < WT)  { b.y = WT;  b.vy =  Math.abs(b.vy) * REBOUND; }
-    if (b.y > WB)  { b.y = WB;  b.vy = -Math.abs(b.vy) * REBOUND; }
+    const r = b.radius || OBR;
+    const bWL = TX + r, bWR = TX + TW - r;
+    const bWT = TY + r, bWB = TY + TH - r;
+
+    if (b.x < bWL) { b.x = bWL; b.vx =  Math.abs(b.vx) * REBOUND; }
+    if (b.x > bWR) { b.x = bWR; b.vx = -Math.abs(b.vx) * REBOUND; }
+    if (b.y < bWT) { b.y = bWT; b.vy =  Math.abs(b.vy) * REBOUND; }
+    if (b.y > bWB) { b.y = bWB; b.vy = -Math.abs(b.vy) * REBOUND; }
   }
 
-  // Ball-ball collisions
+  // Ball-ball collisions (account for different ball sizes)
   for (let i = 0; i < active.length; i++) {
     for (let j = i+1; j < active.length; j++) {
       const a = active[i], b = active[j];
+      const ra = a.radius || OBR;
+      const rb = b.radius || OBR;
       const dx = b.x - a.x, dy = b.y - a.y;
       const d  = Math.sqrt(dx*dx + dy*dy);
-      if (d < BR*2 && d > 0) {
+      const minDist = ra + rb;
+
+      if (d < minDist && d > 0) {
         const nx = dx/d, ny = dy/d;
-        const overlap = BR*2 - d;
+        const overlap = minDist - d;
         a.x -= nx * overlap * 0.5; a.y -= ny * overlap * 0.5;
         b.x += nx * overlap * 0.5; b.y += ny * overlap * 0.5;
 
@@ -490,12 +513,12 @@ function drawTable() {
   ctx.lineWidth = 1;
   ctx.strokeRect(TX+5, TY+5, TW-10, TH-10);
 
-  // Baulk line
-  const baulkY = TY + TH * 0.73;
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 1;
+  // Break line (baulk line) - runs across table width, 1/5 from baulk cushion
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(TX+6, baulkY); ctx.lineTo(TX+TW-6, baulkY);
+  ctx.moveTo(TX + 6, BREAK_LINE_Y);
+  ctx.lineTo(TX + TW - 6, BREAK_LINE_Y);
   ctx.stroke();
 
   // Pockets
@@ -523,18 +546,19 @@ function drawBall(b) {
   if (b.potted) return;
 
   const x = b.x, y = b.y;
+  const r = b.radius || OBR;  // use ball's radius
 
   // Drop shadow
   ctx.beginPath();
-  ctx.arc(x+2, y+3, BR, 0, Math.PI*2);
+  ctx.arc(x+2, y+3, r, 0, Math.PI*2);
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fill();
 
   // Ball body gradient
-  const g = ctx.createRadialGradient(x - BR*0.3, y - BR*0.3, BR*0.05, x, y, BR);
+  const g = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.05, x, y, r);
   switch (b.type) {
     case 'cue':
-      // Bright white cue ball with strong contrast
+      // Bright white cue ball with strong contrast (slightly smaller)
       g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#e8e8e8'); break;
     case 'red':
       g.addColorStop(0, '#ff5858'); g.addColorStop(1, '#7a0000'); break;
@@ -545,13 +569,13 @@ function drawBall(b) {
       g.addColorStop(0, '#2a2a2a'); g.addColorStop(1, '#000000'); break;
   }
   ctx.beginPath();
-  ctx.arc(x, y, BR, 0, Math.PI*2);
+  ctx.arc(x, y, r, 0, Math.PI*2);
   ctx.fillStyle = g;
   ctx.fill();
 
   // Specular highlight
   ctx.beginPath();
-  ctx.arc(x - BR*0.28, y - BR*0.3, BR*0.23, 0, Math.PI*2);
+  ctx.arc(x - r*0.28, y - r*0.3, r*0.23, 0, Math.PI*2);
   ctx.fillStyle = 'rgba(255,255,255,0.52)';
   ctx.fill();
 }
@@ -676,11 +700,11 @@ function onDown(e) {
   if (!running || !cueBall || cueBall.potted) return;
 
   const p = scalePoint(e);
-  const baulkY = TY + TH * 0.73;
+  const aimRadius = CBR * 3.5;  // pointer must start within this of cue ball
 
   // Cue ball placement mode (before break)
   if (placingCueBall) {
-    if (dist(p, cueBall) <= AIM_RADIUS) {
+    if (dist(p, cueBall) <= aimRadius) {
       aiming = true;
       aimPt  = p;
       curPt  = p;
@@ -690,7 +714,7 @@ function onDown(e) {
 
   // Normal aiming mode (after break)
   if (!allStopped()) return;
-  if (dist(p, cueBall) <= AIM_RADIUS) {
+  if (dist(p, cueBall) <= aimRadius) {
     aiming = true;
     aimPt  = p;
     curPt  = p;
@@ -704,10 +728,13 @@ function onMove(e) {
 
   // If placing cue ball, move it with the pointer (constrained to baulk area)
   if (placingCueBall && cueBall) {
-    const baulkY = TY + TH * 0.73;
-    // Constrain to baulk area (behind baulk line)
-    cueBall.x = Math.max(WL, Math.min(WR, curPt.x));
-    cueBall.y = Math.max(baulkY, Math.min(WB, curPt.y));
+    // Constrain to baulk area (behind break line)
+    // Max 50% of cue ball can cross the break line
+    const minY = BREAK_LINE_Y - CBR * 0.5;  // 50% can cross line
+    const maxY = TY + TH - CBR;              // bottom cushion
+
+    cueBall.x = Math.max(TX + CBR, Math.min(TX + TW - CBR, curPt.x));
+    cueBall.y = Math.max(minY, Math.min(maxY, curPt.y));
   }
 }
 
