@@ -222,7 +222,7 @@
     /* ── FOUL POPUP ── */
     .foul-popup {
       display: none;
-      position: absolute;
+      position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
@@ -236,7 +236,7 @@
       text-align: center;
       padding: 0.7rem 2rem;
       border-radius: 0.5rem;
-      z-index: 30;
+      z-index: 9999;
       pointer-events: none;
       line-height: 1.4;
     }
@@ -277,17 +277,21 @@
         <div class="rules-block">
           Pot reds and yellows in any order<br>
           Black must be the final ball<br>
-          Hitting black first = foul<br>
-          Potting the cue ball = foul
+          Hit black first = foul<br>
+          Pot the cue ball = foul<br>
+          Miss every ball = foul
         </div>
         <div class="rules-block">
           Fouls reduce time by 10%<br>
-          Time never drops below 5 seconds
+          If time is 5 seconds or less, fouls do not reduce it further
         </div>
         <div class="rules-block">
           Start with 30 seconds<br>
-          Pot a ball to gain 30 seconds<br>
-          Maximum time is 60 seconds
+          Pot a ball to gain up to 30 seconds<br>
+          Maximum timer is 60 seconds
+        </div>
+        <div class="rules-block">
+          The white must remain on the table when the black is potted
         </div>
       </div>
       <div class="rules-dismiss">Tap to dismiss</div>
@@ -382,9 +386,12 @@ let placingCueBall = false;     // true when placing cue ball before break
 let breakTaken     = false;     // true after first shot
 let timerActive    = false;     // true when timer should count down
 
-// Shot tracking (for black-first foul detection)
-let shotFired        = false;   // true from shot until all balls stop
-let firstContactBall = null;    // first object ball touched by cue ball this shot
+// Shot tracking (for foul detection)
+let shotFired              = false;   // true from shot until all balls stop
+let firstContactBall       = null;    // first object ball touched by cue ball this shot
+let objectBallHit          = false;   // true if cue ball contacted any object ball this shot
+let cueBallPottedThisShot  = false;   // deferred cue ball pocket flag
+let blackPottedLegallyThisShot = false; // deferred legal black pocket flag
 
 // Aiming
 let aiming    = false;
@@ -528,7 +535,9 @@ function respotCueBall() {
 }
 
 function applyFoulPenalty() {
-  timeLeft = Math.max(timeLeft * 0.9, 5);
+  if (timeLeft > 5) {
+    timeLeft = Math.floor(timeLeft * 0.9);
+  }
   updateHUD();
 }
 
@@ -539,17 +548,61 @@ function showFoulPopup() {
 }
 
 function evaluateShotResult() {
-  // Check for black-first foul: first contact was black while reds/yellows remain
-  if (firstContactBall && firstContactBall.type === 'black') {
+  let foulApplied = false;
+
+  // Priority 1: black potted early — handled immediately in pocket detection (endGame)
+
+  // Priority 2: black potted last but cue ball also potted → GAME OVER
+  if (blackPottedLegallyThisShot && cueBallPottedThisShot) {
+    endGame();
+    resetShotTracking();
+    return;
+  }
+
+  // Black potted legally, cue ball on table → VICTORY
+  if (blackPottedLegallyThisShot && !cueBallPottedThisShot) {
+    score += 25;
+    timeLeft = Math.min(timeLeft + TIME_BONUS, MAX_TIME);
+    updateHUD();
+    setTimeout(() => showVictory(), 500);
+    resetShotTracking();
+    return;
+  }
+
+  // Priority 3: cue ball potted → FOUL + respot
+  if (cueBallPottedThisShot) {
+    applyFoulPenalty();
+    showFoulPopup();
+    setTimeout(respotCueBall, 700);
+    foulApplied = true;
+  }
+
+  // Priority 4: black hit first while colours remain → FOUL
+  if (!foulApplied && firstContactBall && firstContactBall.type === 'black') {
     const objectBalls = balls.filter(b => b !== cueBall && b.type !== 'cue' && b.type !== 'black');
     const anyRemain   = objectBalls.some(b => !b.potted);
     if (anyRemain) {
       applyFoulPenalty();
       showFoulPopup();
+      foulApplied = true;
     }
   }
-  firstContactBall = null;
-  shotFired        = false;
+
+  // Priority 5: miss (no object-ball contact) → FOUL
+  if (!foulApplied && !objectBallHit) {
+    applyFoulPenalty();
+    showFoulPopup();
+  }
+
+  resetShotTracking();
+}
+
+function resetShotTracking() {
+  firstContactBall           = null;
+  objectBallHit              = false;
+  shotFired                  = false;
+  cueBallPottedThisShot      = false;
+  blackPottedLegallyThisShot = false;
 }
 
 // ── PHYSICS ──────────────────────────────────────────────────────────────────
@@ -596,9 +649,12 @@ function updatePhysics() {
         const dot = dvx*nx + dvy*ny;
         if (dot > 0) {
           // Track first ball contacted by cue ball this shot
-          if (shotFired && firstContactBall === null) {
-            if (a.type === 'cue') firstContactBall = b;
-            else if (b.type === 'cue') firstContactBall = a;
+          if (shotFired && (a.type === 'cue' || b.type === 'cue')) {
+            objectBallHit = true;
+            if (firstContactBall === null) {
+              if (a.type === 'cue') firstContactBall = b;
+              else firstContactBall = a;
+            }
           }
           a.vx -= dot*nx * 0.97; a.vy -= dot*ny * 0.97;
           b.vx += dot*nx * 0.97; b.vy += dot*ny * 0.97;
@@ -615,24 +671,19 @@ function updatePhysics() {
         b.vx = 0; b.vy = 0;
 
         if (b.type === 'cue') {
-          applyFoulPenalty();
-          showFoulPopup();
-          setTimeout(respotCueBall, 700);
+          // Defer penalty to shot resolution (priority system)
+          cueBallPottedThisShot = true;
         } else if (b.type === 'black') {
-          // Check if black ball potted legally (all other balls gone)
           const objectBalls = balls.filter(ball =>
             ball !== cueBall && ball.type !== 'cue' && ball.type !== 'black'
           );
           const allObjectsGone = objectBalls.every(ball => ball.potted);
 
           if (allObjectsGone) {
-            // Legal black pot - VICTORY!
-            score += 25;
-            timeLeft = Math.min(timeLeft + TIME_BONUS, MAX_TIME);
-            updateHUD();
-            setTimeout(() => showVictory(), 500);
+            // Defer to shot resolution to check if cue ball also potted
+            blackPottedLegallyThisShot = true;
           } else {
-            // Illegal black pot - GAME OVER
+            // Priority 1: black potted early → GAME OVER
             endGame();
           }
         } else {
@@ -796,7 +847,7 @@ function render() {
 // ── HUD ──────────────────────────────────────────────────────────────────────
 function updateHUD() {
   scoreEl.textContent = score;
-  timeEl.textContent  = timeLeft;
+  timeEl.textContent  = Math.floor(timeLeft);
   timeEl.classList.toggle('urgent', timeLeft <= 10);
 }
 
@@ -853,8 +904,11 @@ function startGame() {
   placingCueBall   = true;   // Start in cue ball placement mode
   breakTaken       = false;
   timerActive      = false;
-  shotFired        = false;
-  firstContactBall = null;
+  shotFired                  = false;
+  firstContactBall           = null;
+  objectBallHit              = false;
+  cueBallPottedThisShot      = false;
+  blackPottedLegallyThisShot = false;
   initBalls();
   overlay.classList.remove('active');
   updateHUD();
@@ -958,9 +1012,12 @@ function onUp(e) {
     // Mark that break has been taken
     if (!breakTaken) breakTaken = true;
 
-    // Start tracking this shot for first-contact foul detection
-    shotFired        = true;
-    firstContactBall = null;
+    // Start tracking this shot for foul detection
+    shotFired                  = true;
+    firstContactBall           = null;
+    objectBallHit              = false;
+    cueBallPottedThisShot      = false;
+    blackPottedLegallyThisShot = false;
   }
 
   aiming = false;
@@ -982,8 +1039,8 @@ canvas.addEventListener('touchcancel',onUp,   { passive: false });
 
 // ── RULES SCREEN ─────────────────────────────────────────────────────────────
 function maybeShowRules() {
-  if (sessionStorage.getItem('rulesShown')) return;
-  sessionStorage.setItem('rulesShown', '1');
+  if (sessionStorage.getItem('rulesSeen') === 'true') return;
+  sessionStorage.setItem('rulesSeen', 'true');
 
   const rulesOverlay = document.getElementById('rulesOverlay');
   rulesOverlay.classList.add('active');
