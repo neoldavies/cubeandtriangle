@@ -187,6 +187,79 @@
     }
     .overlay-back:hover { color: var(--text); }
 
+    /* ── RULES OVERLAY ── */
+    .rules-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(5,5,5,0.96);
+      backdrop-filter: blur(6px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      z-index: 9999;
+      padding: 1.5rem;
+      cursor: pointer;
+      text-align: center;
+    }
+    .rules-overlay.active { display: flex; }
+
+    .rules-title {
+      font-size: clamp(1.1rem, 4vw, 1.6rem);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 0.4rem;
+    }
+
+    .rules-list {
+      list-style: none;
+      font-size: clamp(0.75rem, 2.5vw, 0.95rem);
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    .rules-list li + li { margin-top: 0.1rem; }
+
+    .rules-foul-note {
+      font-size: clamp(0.65rem, 2vw, 0.8rem);
+      color: var(--muted);
+      margin-top: 0.5rem;
+      line-height: 1.6;
+    }
+
+    .rules-dismiss {
+      margin-top: 0.9rem;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── FOUL POPUP ── */
+    .foul-popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(180,20,20,0.94);
+      color: #fff;
+      text-align: center;
+      padding: 0.9rem 2rem;
+      border-radius: 0.5rem;
+      z-index: 9999;
+      font-weight: 800;
+      font-size: clamp(1.2rem, 4vw, 1.6rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      pointer-events: none;
+      line-height: 1.4;
+    }
+    .foul-popup.active { display: block; }
+
     /* ── HINT ── */
     .hint {
       font-size: 0.7rem;
@@ -207,7 +280,7 @@
       </div>
       <div class="hud-stat">
         <span class="hud-label">Time</span>
-        <span class="hud-value" id="timeEl">60</span>
+        <span class="hud-value" id="timeEl">30</span>
       </div>
     </div>
   </div>
@@ -223,6 +296,34 @@
       <a class="overlay-back" href="../">&#8592; Back to Cube &amp; Triangle</a>
     </div>
   </div>
+
+  <!-- Rules overlay — shown on first visit, above everything -->
+  <div class="rules-overlay" id="rulesOverlay">
+    <div class="rules-title">English Pool Challenge</div>
+    <ul class="rules-list">
+      <li>Pot reds and yellows in any order</li>
+      <li>Black must be the final ball</li>
+      <li>Hit black first = foul</li>
+      <li>Pot the cue ball = foul</li>
+      <li>Miss every ball = foul</li>
+    </ul>
+    <p class="rules-foul-note">
+      Fouls reduce time by 10%<br>
+      If time is 5 seconds or less, fouls do not reduce it further
+    </p>
+    <ul class="rules-list">
+      <li>Start with 30 seconds</li>
+      <li>Pot a ball to gain 30 seconds</li>
+      <li>Maximum time is 60 seconds</li>
+    </ul>
+    <p class="rules-foul-note">
+      The white must remain on the table when the black is potted
+    </p>
+    <div class="rules-dismiss">Tap to dismiss</div>
+  </div>
+
+  <!-- Foul popup — appears above canvas for ~1 second -->
+  <div class="foul-popup" id="foulPopup">FOUL<br>-10% TIME</div>
 
   <p class="hint">Place cue ball, then drag to aim &mdash; release to shoot</p>
 
@@ -295,8 +396,9 @@ const FRICTION   = 0.985;
 const REBOUND    = 0.92;
 const MAX_VEL    = 18;
 const STOP_VEL   = 0.06;        // velocity threshold for "stopped"
-const GAME_SECS  = 60;          // 60 seconds of active gameplay
-const TIME_BONUS = 2;           // seconds added per potted ball
+const GAME_SECS  = 30;          // 30 seconds to start
+const TIME_BONUS = 30;          // seconds added per potted ball
+const MAX_TIME   = 60;          // time cap
 
 // Ball colours
 const COL = { red:'#e03030', yellow:'#e8c02a', black:'#1a1a1a', white:'#f5f5f0' };
@@ -320,6 +422,13 @@ let timerActive    = false;     // true when timer should count down
 let aiming    = false;
 let aimPt     = null;   // where the drag started
 let curPt     = null;   // current drag position
+
+// Shot tracking (for foul detection)
+let firstContact       = null;   // first object ball the cue ball struck
+let objectBallHit      = false;  // whether cue ball contacted any object ball
+let foulThisShot       = false;  // at most one foul per shot
+let shotInProgress     = false;  // true from the moment a shot is fired until all balls stop
+let blackPottedLegally = false;  // black legally potted, awaiting shot end to confirm victory
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function d2(a, b) { const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; }
@@ -419,11 +528,43 @@ function initBalls() {
 function respotCueBall() {
   if (!running) return;
   const others = balls.filter(b => !b.potted && b !== cueBall);
-  // Respot behind break line in baulk area
-  const pos = findFreeSpot(others, TX + CBR * 2, TX + TW - CBR * 2, BREAK_LINE_Y, TY + TH - CBR * 2)
-            || { x: TX + TW / 2, y: BREAK_LINE_Y + CBR * 2 };
-  cueBall.x = pos.x; cueBall.y = pos.y;
-  cueBall.vx = 0;    cueBall.vy = 0;
+
+  // Target: exact centre of baulk area
+  // X = exact centre between side cushions
+  // Y = midpoint between baulk cushion inner edge and baulk line
+  const respotX = TX + TW / 2;
+  const respotY = (BREAK_LINE_Y + (TY + TH)) / 2;
+
+  function isLegal(x, y) {
+    if (x < TX + CBR || x > TX + TW - CBR) return false;
+    if (y < BREAK_LINE_Y || y > TY + TH - CBR) return false;
+    return others.every(b => dist({ x, y }, b) > (b.radius || OBR) + CBR + 1);
+  }
+
+  let px = respotX, py = respotY;
+
+  if (!isLegal(px, py)) {
+    let placed = false;
+    outer: for (let step = 1; step <= 60 && !placed; step++) {
+      const r = step * CBR * 0.55;
+      const steps = Math.max(8, Math.round(r * Math.PI / (CBR * 0.4)));
+      for (let i = 0; i < steps; i++) {
+        const angle = (i / steps) * Math.PI * 2;
+        const x = respotX + Math.cos(angle) * r;
+        const y = respotY + Math.sin(angle) * r;
+        if (isLegal(x, y)) {
+          px = x; py = y;
+          placed = true;
+          break outer;
+        }
+      }
+    }
+  }
+
+  cueBall.x = px;
+  cueBall.y = py;
+  cueBall.vx = 0;
+  cueBall.vy = 0;
   cueBall.potted = false;
 }
 
@@ -473,6 +614,17 @@ function updatePhysics() {
           a.vx -= dot*nx * 0.97; a.vy -= dot*ny * 0.97;
           b.vx += dot*nx * 0.97; b.vy += dot*ny * 0.97;
         }
+
+        // Track first object ball the cue ball contacts
+        if (shotInProgress && !objectBallHit) {
+          if (a.type === 'cue' && b.type !== 'cue') {
+            firstContact = b;
+            objectBallHit = true;
+          } else if (b.type === 'cue' && a.type !== 'cue') {
+            firstContact = a;
+            objectBallHit = true;
+          }
+        }
       }
     }
   }
@@ -485,29 +637,32 @@ function updatePhysics() {
         b.vx = 0; b.vy = 0;
 
         if (b.type === 'cue') {
-          score -= 5;
+          // Cue ball scratch — foul + respot
+          if (!foulThisShot) {
+            foulThisShot = true;
+            applyTimePenalty();
+            showFoulPopup();
+          }
           setTimeout(respotCueBall, 700);
         } else if (b.type === 'black') {
-          // Check if black ball potted legally (all other balls gone)
+          // Check if black was potted legally (all reds/yellows already potted)
           const objectBalls = balls.filter(ball =>
             ball !== cueBall && ball.type !== 'cue' && ball.type !== 'black'
           );
           const allObjectsGone = objectBalls.every(ball => ball.potted);
 
           if (allObjectsGone) {
-            // Legal black pot - VICTORY!
-            score += 25;
-            timeLeft += TIME_BONUS;
-            updateHUD();
-            setTimeout(() => showVictory(), 500);
+            // Defer victory check until shot ends — need to confirm cue ball stays on table
+            blackPottedLegally = true;
           } else {
-            // Illegal black pot - GAME OVER
-            endGame();
+            // Early black — game over immediately
+            shotInProgress = false;
+            setTimeout(() => endGame(), 300);
           }
         } else {
-          // Regular red or yellow ball
+          // Regular red or yellow ball — award time bonus
           score += 10;
-          timeLeft += TIME_BONUS;
+          timeLeft = Math.min(timeLeft + TIME_BONUS, MAX_TIME);
         }
         updateHUD();
         break;
@@ -665,7 +820,7 @@ function render() {
 // ── HUD ──────────────────────────────────────────────────────────────────────
 function updateHUD() {
   scoreEl.textContent = score;
-  timeEl.textContent  = timeLeft;
+  timeEl.textContent  = Math.ceil(timeLeft);
   timeEl.classList.toggle('urgent', timeLeft <= 10);
 }
 
@@ -677,6 +832,12 @@ function loop(ts) {
   lastTs = ts;
 
   updatePhysics();
+
+  // Detect end of shot and run foul / win checks
+  if (shotInProgress && allStopped()) {
+    shotInProgress = false;
+    handleShotEnd();
+  }
 
   // Timer logic: only count down when cue ball is stopped
   const cueIsStopped = cueBallStopped();
@@ -704,19 +865,89 @@ function loop(ts) {
   rafId = requestAnimationFrame(loop);
 }
 
+// ── PENALTY & FOUL HELPERS ───────────────────────────────────────────────────
+function applyTimePenalty() {
+  if (timeLeft > 5) {
+    timeLeft = timeLeft * 0.9;
+    updateHUD();
+  }
+}
+
+function showFoulPopup() {
+  const popup = document.getElementById('foulPopup');
+  popup.classList.add('active');
+  setTimeout(() => popup.classList.remove('active'), 1000);
+}
+
+function handleShotEnd() {
+  // ── Victory check: black legally potted ──
+  if (blackPottedLegally) {
+    blackPottedLegally = false;
+    if (cueBall && cueBall.potted) {
+      // Cue ball also went in on same shot — not a legal win
+      endGame();
+    } else {
+      showVictory();
+    }
+    return;
+  }
+
+  // Foul already applied this shot (e.g. cue ball scratch) — skip further checks
+  if (foulThisShot) return;
+
+  // ── Black-first foul ──
+  const redsYellows = balls.filter(b => !b.potted && (b.type === 'red' || b.type === 'yellow'));
+  if (firstContact && firstContact.type === 'black' && redsYellows.length > 0) {
+    foulThisShot = true;
+    applyTimePenalty();
+    showFoulPopup();
+    return;
+  }
+
+  // ── Miss foul: cue ball contacted no object ball ──
+  if (!objectBallHit) {
+    foulThisShot = true;
+    applyTimePenalty();
+    showFoulPopup();
+    return;
+  }
+}
+
+// ── RULES OVERLAY ────────────────────────────────────────────────────────────
+function initRulesOverlay() {
+  if (sessionStorage.getItem('rulesSeen') !== 'true') {
+    const ro = document.getElementById('rulesOverlay');
+    ro.classList.add('active');
+
+    function dismiss() {
+      ro.classList.remove('active');
+      sessionStorage.setItem('rulesSeen', 'true');
+    }
+
+    ro.addEventListener('click',      dismiss, { once: true });
+    ro.addEventListener('touchstart', dismiss, { once: true, passive: true });
+    setTimeout(dismiss, 5000);
+  }
+}
+
 function startGame() {
   if (rafId) cancelAnimationFrame(rafId);
-  score           = 0;
-  timeLeft        = GAME_SECS;
-  timerAcc        = 0;
-  lastTs          = null;
-  aiming          = false;
-  aimPt           = null;
-  curPt           = null;
-  running         = true;
-  placingCueBall  = true;   // Start in cue ball placement mode
-  breakTaken      = false;
-  timerActive     = false;
+  score              = 0;
+  timeLeft           = GAME_SECS;
+  timerAcc           = 0;
+  lastTs             = null;
+  aiming             = false;
+  aimPt              = null;
+  curPt              = null;
+  running            = true;
+  placingCueBall     = true;   // Start in cue ball placement mode
+  breakTaken         = false;
+  timerActive        = false;
+  firstContact       = null;
+  objectBallHit      = false;
+  foulThisShot       = false;
+  shotInProgress     = false;
+  blackPottedLegally = false;
   initBalls();
   overlay.classList.remove('active');
   updateHUD();
@@ -817,6 +1048,13 @@ function onUp(e) {
     cueBall.vx   = Math.cos(angle) * speed;
     cueBall.vy   = Math.sin(angle) * speed;
 
+    // Reset per-shot tracking
+    firstContact       = null;
+    objectBallHit      = false;
+    foulThisShot       = false;
+    shotInProgress     = true;
+    blackPottedLegally = false;
+
     // Mark that break has been taken
     if (!breakTaken) {
       breakTaken = true;
@@ -843,6 +1081,7 @@ canvas.addEventListener('touchcancel',onUp,   { passive: false });
 // ── START ────────────────────────────────────────────────────────────────────
 initLayout();
 startGame();
+initRulesOverlay();
 </script>
 </body>
 </html>
