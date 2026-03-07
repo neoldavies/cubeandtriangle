@@ -238,12 +238,16 @@ const isPortrait = window.innerHeight > window.innerWidth;
 
 let CW, CH;
 if (isPortrait) {
-  // Portrait: use visualViewport for accurate mobile sizing
-  const viewportHeight = window.visualViewport?.height || window.innerHeight;
-  // Account for HUD (~60px) + padding (~40px) + gap (~10px) = ~110px
-  const availHeight = viewportHeight - 110;
-  CH = Math.min(availHeight * 0.85, 800);  // 85% of available, max 800px
-  CW = CH / 2;                              // 2:1 ratio (width is half height)
+  // Portrait: width-driven sizing so the full 2:1 table is always visible
+  const vw = window.visualViewport?.width  || window.innerWidth;
+  const vh = window.visualViewport?.height || window.innerHeight;
+  // Non-canvas UI: body padding (24px) + HUD (~52px) + gaps (~20px) + hint (~24px) ≈ 120px
+  const uiOverhead = 120;
+  const availW = vw - 24;         // available width (subtract body horizontal padding)
+  const availH = vh - uiOverhead; // available height for the canvas
+  // Size from available width; cap so the 2:1 table always fits vertically
+  CW = Math.min(availW, availH / 2);
+  CH = CW * 2;
 } else {
   // Landscape: traditional desktop layout
   CW = 800;
@@ -253,6 +257,14 @@ if (isPortrait) {
 // Update canvas size
 canvas.width  = CW;
 canvas.height = CH;
+
+// Portrait: constrain CSS display width so width:100% doesn't scale the
+// canvas beyond CW (which would make the 2:1 height overflow the viewport)
+if (isPortrait) {
+  canvas.style.maxWidth    = CW + 'px';
+  canvas.style.marginLeft  = 'auto';
+  canvas.style.marginRight = 'auto';
+}
 
 const CU = CW * 0.0375;          // cushion thickness (3.75% of width)
 const TX = CU, TY = CU;          // table felt top-left
