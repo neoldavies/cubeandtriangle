@@ -98,6 +98,10 @@
     .canvas-wrap {
       width: 100%;
       max-width: 820px;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       position: relative;
       border-radius: 0.5rem;
       overflow: hidden;
@@ -106,7 +110,9 @@
 
     canvas {
       display: block;
-      width: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
       height: auto;
       cursor: crosshair;
       touch-action: none;
@@ -233,55 +239,56 @@ const finalEl = document.getElementById('finalEl');
 document.getElementById('playAgainBtn').addEventListener('click', startGame);
 
 // ── LAYOUT CONSTANTS ─────────────────────────────────────────────────────────
-// Detect orientation and calculate responsive canvas dimensions
-const isPortrait = window.innerHeight > window.innerWidth;
+let CW, CH, CU, TX, TY, TW, TH, OBR, CBR, PR, POCKETS, WL, WR, WT, WB, BREAK_LINE_Y;
 
-let CW, CH;
-if (isPortrait) {
-  // Portrait: use visualViewport for accurate mobile sizing
-  const viewportHeight = window.visualViewport?.height || window.innerHeight;
-  // Account for HUD (~60px) + padding (~40px) + gap (~10px) = ~110px
-  const availHeight = viewportHeight - 110;
-  CH = Math.min(availHeight * 0.85, 800);  // 85% of available, max 800px
-  CW = CH / 2;                              // 2:1 ratio (width is half height)
-} else {
-  // Landscape: traditional desktop layout
-  CW = 800;
-  CH = 400;
+function initLayout() {
+  const wrap        = canvas.parentElement;   // .canvas-wrap
+  const containerH  = wrap.clientHeight;
+  const containerW  = wrap.clientWidth;
+  const isPortrait  = window.innerHeight > window.innerWidth;
+
+  if (isPortrait) {
+    // Size canvas to fit container height with cue-clearance margins top and bottom.
+    // cueClearance ≈ railWidth ≈ CU = CW * 0.0375 = (CH/2) * 0.0375 = CH * 0.01875
+    // CH + 2 * (CH * 0.01875) = containerH  →  CH = containerH / 1.0375
+    CH = Math.floor(containerH / 1.0375);
+    CW = Math.floor(CH / 2);
+    if (CW > containerW) { CW = containerW; CH = CW * 2; }
+  } else {
+    CW = 800;
+    CH = 400;
+  }
+
+  canvas.width  = CW;
+  canvas.height = CH;
+
+  CU           = CW * 0.0375;          // rail/cushion thickness (3.75% of canvas width)
+  TX = CU;  TY = CU;                   // felt top-left
+  TW           = CW - CU * 2;          // felt width
+  TH           = CH - CU * 2;          // felt height
+
+  // Ball sizes — English pool proportions derived from table width
+  OBR          = TW * 0.0278;          // object ball radius (≈ 5.56% diameter)
+  CBR          = TW * 0.0260;          // cue ball radius   (≈ 5.20% diameter)
+  PR           = OBR * 1.7;            // pocket radius
+
+  // Pocket positions — 4 corners + 2 centre (long-rail midpoints)
+  POCKETS = [
+    { x: TX,       y: TY           },  // top-left
+    { x: TX + TW,  y: TY           },  // top-right
+    { x: TX,       y: TY + TH / 2  },  // left-centre
+    { x: TX + TW,  y: TY + TH / 2  },  // right-centre
+    { x: TX,       y: TY + TH      },  // bottom-left  (baulk end)
+    { x: TX + TW,  y: TY + TH      },  // bottom-right (baulk end)
+  ];
+
+  // Physics walls
+  WL = TX + OBR;  WR = TX + TW - OBR;
+  WT = TY + OBR;  WB = TY + TH - OBR;
+
+  // Break line (1/5 of table length from baulk cushion at bottom)
+  BREAK_LINE_Y = TY + TH - TH * 0.2;
 }
-
-// Update canvas size
-canvas.width  = CW;
-canvas.height = CH;
-
-const CU = CW * 0.0375;          // cushion thickness (3.75% of width)
-const TX = CU, TY = CU;          // table felt top-left
-const TW = CW - CU * 2;          // table width (short side)
-const TH = CH - CU * 2;          // table height (long side)
-
-// Ball sizes - proper English pool proportions
-const OBR = TW * 0.0278;         // object ball radius (2.78% of table width)
-const CBR = TW * 0.0260;         // cue ball radius (2.60% of table width - slightly smaller)
-const PR = OBR * 1.8;            // pocket radius
-
-// Pocket positions — 4 corners + 2 centre (long-rail midpoints)
-// In portrait: long rails are vertical (left/right), short rails are horizontal (top/bottom)
-// In landscape: long rails are horizontal (top/bottom), short rails are vertical (left/right)
-const POCKETS = [
-  { x: TX,        y: TY            },  // top-left corner
-  { x: TX + TW,   y: TY            },  // top-right corner
-  { x: TX,        y: TY + TH / 2   },  // left-center (long rail midpoint)
-  { x: TX + TW,   y: TY + TH / 2   },  // right-center (long rail midpoint)
-  { x: TX,        y: TY + TH       },  // bottom-left corner (baulk end)
-  { x: TX + TW,   y: TY + TH       },  // bottom-right corner (baulk end)
-];
-
-// Physics walls (use object ball radius as max for bounds)
-const WL = TX + OBR,  WR = TX + TW - OBR;
-const WT = TY + OBR,  WB = TY + TH - OBR;
-
-// Break line (1/5 of table length from baulk cushion at bottom)
-const BREAK_LINE_Y = TY + TH - (TH * 0.2);
 
 // ── PHYSICS TUNING ───────────────────────────────────────────────────────────
 const FRICTION   = 0.985;
@@ -834,6 +841,7 @@ canvas.addEventListener('touchend',   onUp,   { passive: false });
 canvas.addEventListener('touchcancel',onUp,   { passive: false });
 
 // ── START ────────────────────────────────────────────────────────────────────
+initLayout();
 startGame();
 </script>
 </body>
