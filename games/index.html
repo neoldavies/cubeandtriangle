@@ -233,10 +233,20 @@ const finalEl = document.getElementById('finalEl');
 document.getElementById('playAgainBtn').addEventListener('click', startGame);
 
 // ── LAYOUT CONSTANTS ─────────────────────────────────────────────────────────
-// Detect orientation and set canvas dimensions
+// Detect orientation and calculate responsive canvas dimensions
 const isPortrait = window.innerHeight > window.innerWidth;
-const CW = isPortrait ? 400 : 800;
-const CH = isPortrait ? 800 : 400;
+
+let CW, CH;
+if (isPortrait) {
+  // Portrait: use 85% of viewport height, maintain 2:1 ratio
+  const availHeight = window.innerHeight - 120; // subtract HUD + padding
+  CH = Math.min(availHeight * 0.9, 800);        // max 800px height
+  CW = CH / 2;                                   // 2:1 ratio (width is half height)
+} else {
+  // Landscape: traditional desktop layout
+  CW = 800;
+  CH = 400;
+}
 
 // Update canvas size
 canvas.width  = CW;
@@ -253,13 +263,15 @@ const CBR = TW * 0.0260;         // cue ball radius (2.60% of table width - slig
 const PR = OBR * 1.8;            // pocket radius
 
 // Pocket positions — 4 corners + 2 centre (long-rail midpoints)
+// In portrait: long rails are vertical (left/right), short rails are horizontal (top/bottom)
+// In landscape: long rails are horizontal (top/bottom), short rails are vertical (left/right)
 const POCKETS = [
-  { x: TX,            y: TY            },  // top-left
-  { x: TX + TW / 2,  y: TY            },  // top-centre
-  { x: TX + TW,      y: TY            },  // top-right
-  { x: TX,            y: TY + TH       },  // bottom-left (baulk end)
-  { x: TX + TW / 2,  y: TY + TH       },  // bottom-centre (baulk end)
-  { x: TX + TW,      y: TY + TH       },  // bottom-right (baulk end)
+  { x: TX,        y: TY            },  // top-left corner
+  { x: TX + TW,   y: TY            },  // top-right corner
+  { x: TX,        y: TY + TH / 2   },  // left-center (long rail midpoint)
+  { x: TX + TW,   y: TY + TH / 2   },  // right-center (long rail midpoint)
+  { x: TX,        y: TY + TH       },  // bottom-left corner (baulk end)
+  { x: TX + TW,   y: TY + TH       },  // bottom-right corner (baulk end)
 ];
 
 // Physics walls (use object ball radius as max for bounds)
@@ -337,34 +349,36 @@ function initBalls() {
   balls = [];
 
   // Create proper English pool rack (15 balls: 7 red, 7 yellow, 1 black)
-  // Position rack in upper portion of table (away from baulk)
-  const rackCenterX = TX + TW / 2;           // centered horizontally
-  const rackApexY = TY + TH * 0.25;          // 25% from top (75% from baulk)
-  const gap = OBR * 2.001;                   // tight packing (balls touching)
+  // Rack positioned at legal spot: ~70% from baulk cushion
+  const rackCenterX = TX + TW / 2;                    // centered horizontally
+  const rackCenterY = (TY + TH) - (TH * 0.7);        // 70% from baulk (at bottom)
+  const gap = OBR * 2.001;                            // tight packing (balls touching)
 
   // English pool rack pattern (5 rows forming triangle):
-  // Row 1: 1 ball (apex - faces breaking player)
-  // Row 2: 2 balls
-  // Row 3: 3 balls (black in center)
-  // Row 4: 4 balls
-  // Row 5: 5 balls (base)
+  // In portrait mode, apex (row 0) is at the BOTTOM (closest to player)
+  // Base (row 4) is at the TOP (furthest from player)
+  // Row 0: 1 ball (apex - faces breaking player at bottom)
+  // Row 1: 2 balls
+  // Row 2: 3 balls (black in center)
+  // Row 3: 4 balls
+  // Row 4: 5 balls (base - away from player)
 
   const pattern = [
-    // Row 1 (apex)
+    // Row 0 (apex - closest to player)
     { row: 0, col: 0, type: 'red' },
-    // Row 2
+    // Row 1
     { row: 1, col: 0, type: 'yellow' },
     { row: 1, col: 1, type: 'red' },
-    // Row 3 (black in center)
+    // Row 2 (black in center)
     { row: 2, col: 0, type: 'red' },
     { row: 2, col: 1, type: 'black' },
     { row: 2, col: 2, type: 'yellow' },
-    // Row 4
+    // Row 3
     { row: 3, col: 0, type: 'yellow' },
     { row: 3, col: 1, type: 'red' },
     { row: 3, col: 2, type: 'yellow' },
     { row: 3, col: 3, type: 'red' },
-    // Row 5 (base)
+    // Row 4 (base - away from player)
     { row: 4, col: 0, type: 'red' },
     { row: 4, col: 1, type: 'yellow' },
     { row: 4, col: 2, type: 'yellow' },
@@ -373,9 +387,10 @@ function initBalls() {
   ];
 
   for (const p of pattern) {
-    // Triangle points toward baulk (away from apex)
+    // Triangle apex points toward player (down in portrait)
+    // Row 0 is at rackCenterY, rows above it go UP (decreasing Y)
     const x = rackCenterX + (p.col - p.row / 2) * gap;
-    const y = rackApexY + p.row * gap * 0.866;  // 0.866 = sin(60°) for triangle rows
+    const y = rackCenterY - p.row * gap * 0.866;  // 0.866 = sin(60°), negative to go up
     balls.push({ x, y, vx: 0, vy: 0, type: p.type, potted: false, radius: OBR });
   }
 
@@ -459,17 +474,30 @@ function updatePhysics() {
       if (dist(b, p) < PR * 0.88) {
         b.potted = true;
         b.vx = 0; b.vy = 0;
+
         if (b.type === 'cue') {
           score -= 5;
           setTimeout(respotCueBall, 700);
-        } else {
-          // Award points and time bonus
-          if (b.type === 'black') {
+        } else if (b.type === 'black') {
+          // Check if black ball potted legally (all other balls gone)
+          const objectBalls = balls.filter(ball =>
+            ball !== cueBall && ball.type !== 'cue' && ball.type !== 'black'
+          );
+          const allObjectsGone = objectBalls.every(ball => ball.potted);
+
+          if (allObjectsGone) {
+            // Legal black pot - VICTORY!
             score += 25;
+            timeLeft += TIME_BONUS;
+            updateHUD();
+            setTimeout(() => showVictory(), 500);
           } else {
-            score += 10;
+            // Illegal black pot - GAME OVER
+            endGame();
           }
-          // Add time bonus for potted ball
+        } else {
+          // Regular red or yellow ball
+          score += 10;
           timeLeft += TIME_BONUS;
         }
         updateHUD();
@@ -691,7 +719,23 @@ function endGame() {
   if (rafId) cancelAnimationFrame(rafId);
   render();
   finalEl.textContent = score;
+  document.querySelector('.overlay-title').textContent = "Time's Up!";
   overlay.classList.add('active');
+}
+
+function showVictory() {
+  running = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  render();
+  finalEl.textContent = score;
+  document.querySelector('.overlay-title').textContent = 'Victory!';
+  overlay.classList.add('active');
+
+  // Auto-rerack after 4 seconds
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    startGame();
+  }, 4000);
 }
 
 // ── INPUT ────────────────────────────────────────────────────────────────────
