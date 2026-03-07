@@ -238,10 +238,12 @@ const isPortrait = window.innerHeight > window.innerWidth;
 
 let CW, CH;
 if (isPortrait) {
-  // Portrait: use 85% of viewport height, maintain 2:1 ratio
-  const availHeight = window.innerHeight - 120; // subtract HUD + padding
-  CH = Math.min(availHeight * 0.9, 800);        // max 800px height
-  CW = CH / 2;                                   // 2:1 ratio (width is half height)
+  // Portrait: use visualViewport for accurate mobile sizing
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  // Account for HUD (~60px) + padding (~40px) + gap (~10px) = ~110px
+  const availHeight = viewportHeight - 110;
+  CH = Math.min(availHeight * 0.85, 800);  // 85% of available, max 800px
+  CW = CH / 2;                              // 2:1 ratio (width is half height)
 } else {
   // Landscape: traditional desktop layout
   CW = 800;
