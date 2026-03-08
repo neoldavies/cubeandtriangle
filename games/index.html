@@ -330,7 +330,7 @@ function initLayout() {
   CU           = CW * 0.0375;          // rail/cushion thickness (3.75% of canvas width)
   TX = CU;  TY = CU;                   // felt top-left
   TW           = CW - CU * 2;          // felt width
-  TH           = CH - CU * 2;          // felt height
+  TH           = CH - CU * 2 - CH * 0.08; // felt height (with cue clearance)
 
   // Ball sizes — English pool proportions derived from table width
   OBR          = TW * 0.0278;          // object ball radius (≈ 5.56% diameter)
