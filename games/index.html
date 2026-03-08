@@ -317,8 +317,10 @@ function initLayout() {
   const isPortrait  = window.innerHeight > window.innerWidth;
 
   if (isPortrait) {
-    CW = 400;
-    CH = 800;
+    const H = window.innerHeight;
+    const playableH = Math.floor(H * 0.85);
+    CH = playableH;
+    CW = Math.floor(CH / 2);
   } else {
     CW = 800;
     CH = 400;
