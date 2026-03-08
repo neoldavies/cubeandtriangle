@@ -106,8 +106,7 @@
 
     canvas {
       display: block;
-      width: 100%;
-      height: auto;
+      margin: 0 auto;
       cursor: crosshair;
       touch-action: none;
       user-select: none;
@@ -326,6 +325,43 @@ function initLayout() {
 
   canvas.width  = CW;
   canvas.height = CH;
+
+  // ── Height-driven display sizing ─────────────────────────────────────────
+  // Never size from viewport width. Measure available vertical space first,
+  // then derive canvas width strictly from the 2:1 pool-table ratio.
+  const vpH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const vpW = window.visualViewport ? window.visualViewport.width  : window.innerWidth;
+
+  const hudEl  = document.querySelector('.hud');
+  const hintEl = document.querySelector('.hint');
+  const hudH   = hudEl  ? hudEl.getBoundingClientRect().height : 48;
+  const hintH  = hintEl ? hintEl.getBoundingClientRect().height : 22;
+
+  // Body chrome: padding-top(12) + padding-bottom(20) + 2×gap(10) = 52px fixed,
+  // plus 8% of viewport height reserved as cue clearance around all four sides.
+  const bodyChrome = 52 + Math.round(vpH * 0.08);
+  const availH     = Math.max(vpH - hudH - hintH - bodyChrome, 100);
+
+  let dW, dH;
+  if (isPortrait) {
+    // Portrait: height is the long side; width = height / 2
+    dH = availH;
+    dW = Math.floor(dH / 2);
+    // Clamp to viewport width with horizontal cue clearance (16% reserved)
+    const maxW = Math.floor(vpW * 0.84);
+    if (dW > maxW) { dW = maxW; dH = dW * 2; }
+  } else {
+    // Landscape: height is the short side; width = height × 2
+    dH = availH;
+    dW = Math.floor(dH * 2);
+    // Clamp to viewport width with horizontal cue clearance (12% reserved)
+    const maxW = Math.floor(vpW * 0.88);
+    if (dW > maxW) { dW = maxW; dH = Math.floor(dW / 2); }
+  }
+
+  canvas.style.width  = dW + 'px';
+  canvas.style.height = dH + 'px';
+  // ── End height-driven sizing ──────────────────────────────────────────────
 
   CU           = CW * 0.0375;          // rail/cushion thickness (3.75% of canvas width)
   TX = CU;  TY = CU;                   // felt top-left
