@@ -314,18 +314,25 @@ document.getElementById('playAgainBtn').addEventListener('click', startGame);
 let CW, CH, CU, TX, TY, TW, TH, OBR, CBR, PR, POCKETS, WL, WR, WT, WB, BREAK_LINE_Y;
 
 function initLayout() {
-  const isPortrait  = window.innerHeight > window.innerWidth;
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const hud  = document.querySelector('.hud');
+  const hint = document.querySelector('.hint');
+  const H    = window.innerHeight - (hud.offsetHeight + hint.offsetHeight);
+  const playableH = Math.floor(H * 0.92);
 
   if (isPortrait) {
-    CW = 400;
-    CH = 800;
+    CH = playableH;
+    CW = Math.floor(CH / 2);
   } else {
-    CW = 800;
-    CH = 400;
+    CH = playableH;
+    CW = Math.min(Math.floor(CH * 2), window.innerWidth);
+    if (CW < Math.floor(CH * 2)) CH = Math.floor(CW / 2);
   }
 
-  canvas.width  = CW;
-  canvas.height = CH;
+  canvas.width        = CW;
+  canvas.height       = CH;
+  canvas.style.width  = CW + 'px';
+  canvas.style.height = CH + 'px';
 
   CU           = CW * 0.0375;          // rail/cushion thickness (3.75% of canvas width)
   TX = CU;  TY = CU;                   // felt top-left
@@ -1003,6 +1010,9 @@ function maybeShowRules() {
 initLayout();
 startGame();
 maybeShowRules();
+
+window.addEventListener('resize',            () => { initLayout(); startGame(); });
+window.addEventListener('orientationchange', () => { initLayout(); startGame(); });
 </script>
 </body>
 </html>
