@@ -108,6 +108,9 @@
       display: block;
       width: 100%;
       height: auto;
+      max-height: 70vh;
+      max-height: calc(70vh - env(safe-area-inset-bottom));
+      object-fit: contain;
       cursor: crosshair;
       touch-action: none;
       user-select: none;
@@ -317,8 +320,16 @@ function initLayout() {
   const isPortrait  = window.innerHeight > window.innerWidth;
 
   if (isPortrait) {
-    CW = 400;
-    CH = 800;
+    const H = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const playableH = Math.floor(H * 0.70);
+    CH = playableH;
+    CW = Math.floor(CH / 2);
+    canvas.width  = CW;
+    canvas.height = CH;
+    canvas.style.width  = '100%';
+    canvas.style.height = 'auto';
+    canvas.parentElement.style.marginTop    = 'auto';
+    canvas.parentElement.style.marginBottom = 'auto';
   } else {
     CW = 800;
     CH = 400;
