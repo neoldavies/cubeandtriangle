@@ -317,10 +317,12 @@ function initLayout() {
   const isPortrait  = window.innerHeight > window.innerWidth;
 
   if (isPortrait) {
-    const H = window.innerHeight;
-    const playableH = Math.floor(H * 0.85);
+    const H = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const playableH = Math.floor(H * 0.75);
     CH = playableH;
     CW = Math.floor(CH / 2);
+    canvas.parentElement.style.marginTop    = 'auto';
+    canvas.parentElement.style.marginBottom = 'auto';
   } else {
     CW = 800;
     CH = 400;
